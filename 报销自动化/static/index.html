@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社团报销材料自动化生成</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#fff; --line:#e3e8ef; --text:#1f2937; --muted:#6b7280;
+    --brand:#2f6fed; --brand-d:#1f56c0; --ok:#16a34a; --danger:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+  .wrap{max-width:1060px;margin:0 auto;padding:24px 20px 80px}
+  header{text-align:center;padding:18px 0 22px}
+  header h1{font-size:24px;margin:0 0 6px}
+  header p{margin:0;color:var(--muted);font-size:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:18px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .card h2{font-size:16px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:720px){.grid{grid-template-columns:1fr 1fr}}
+  .field label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px}
+  .field label em{color:var(--danger);font-style:normal;margin-left:2px}
+  .field input,.field select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fbfcfe}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(47,111,237,.12)}
+  .drop{border:2px dashed #c6cfdc;border-radius:10px;padding:22px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s;background:#fbfcfe}
+  .drop:hover,.drop.drag{border-color:var(--brand);background:#f0f5ff;color:var(--brand)}
+  .drop b{color:var(--text)}
+  .drop input{display:none}
+  .files{margin-top:10px;font-size:12px;color:var(--muted);max-height:90px;overflow:auto}
+  .files div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:8px;padding:11px 22px;font-size:15px;cursor:pointer;font-weight:600;transition:.15s}
+  .btn-primary{background:var(--brand);color:#fff}
+  .btn-primary:hover{background:var(--brand-d)}
+  .btn-primary:disabled{background:#9db9f0;cursor:not-allowed}
+  .btn-success{background:var(--ok);color:#fff}
+  .btn-success:hover{background:#128a3c}
+  .btn-ghost{background:#fff;border:1px solid var(--line);color:var(--text)}
+  .btn-danger{background:#fff;border:1px solid #fecaca;color:var(--danger)}
+  .row-center{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+  .hint{font-size:12px;color:var(--muted)}
+  .tip{font-size:12px;color:#4f46e5;background:#eef2ff;border-radius:8px;padding:8px 12px;margin-top:10px}
+  .summary-bar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:12px 16px;background:#f0f5ff;border-radius:10px;margin-top:16px}
+  .summary-bar .num{font-size:20px;font-weight:700;color:var(--brand)}
+  table.items{width:100%;border-collapse:collapse;font-size:13px}
+  table.items th{background:#f7f9fc;color:var(--muted);font-weight:600;text-align:left;padding:8px;border-bottom:2px solid var(--line);white-space:nowrap}
+  table.items td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  table.items input,table.items select{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px;width:100%;background:#fff}
+  table.items input:focus,table.items select:focus{outline:none;border-color:var(--brand)}
+  table.items .thumb{width:56px;height:42px;object-fit:cover;border:1px solid var(--line);border-radius:4px;background:#f0f0f0;display:block}
+  .num-in{width:72px}
+  .tag{font-size:12px;padding:2px 8px;border-radius:20px;background:#eef2ff;color:#4f46e5}
+  textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:14px;font-family:inherit;resize:vertical;min-height:60px}
+  .spinner{width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .hidden{display:none}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 18px;border-radius:8px;font-size:14px;opacity:0;transition:.3s;pointer-events:none;z-index:99}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>社团报销材料自动化生成</h1>
+    <p>上传按规范命名的发票 → 自动解析 → 一键生成「支出单」「报销说明」「发票订单明细」</p>
+  </header>
+
+  <!-- 基本信息 -->
+  <div class="card">
+    <h2>① 基本信息</h2>
+    <div class="grid">
+      <div class="field"><label>报销人姓名 <em>*</em></label><input id="name"></div>
+      <div class="field"><label>学号 / 工资号 <em>*</em></label><input id="student_id"></div>
+      <div class="field"><label>联系电话 <em>*</em></label><input id="phone"></div>
+      <div class="field"><label>所属部门</label><input id="department" value="校团委社团管理部"></div>
+      <div class="field" style="grid-column:span 2"><label>活动事由 <em>*</em></label><input id="activity" placeholder="如：武术协会百团大战活动物资采购费用"></div>
+      <div class="field"><label>票据张数（默认=发票张数，可改）</label><input id="ticket_count" type="number" min="1" placeholder="自动"></div>
+    </div>
+  </div>
+
+  <!-- 上传 -->
+  <div class="card">
+    <h2>② 上传发票与订单截图</h2>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div>
+        <div class="drop" id="drop_inv"><b>点击选择或拖入「发票」</b><br>支持 PDF / JPG / PNG，可多选<input type="file" id="inv_input" accept=".pdf,.jpg,.jpeg,.png,.bmp,.webp" multiple></div>
+        <div class="files" id="inv_files"></div>
+      </div>
+      <div>
+        <div class="drop" id="drop_ord"><b>点击选择或拖入「订单截图」</b><br>支持 JPG / PNG，可多选（按顺序与发票一一对应）<input type="file" id="ord_input" accept=".jpg,.jpeg,.png,.bmp,.webp" multiple></div>
+        <div class="files" id="ord_files"></div>
+      </div>
+    </div>
+    <div class="tip">发票文件名请按 <b>物品+数量+单价+金额</b> 命名，例如：<b>手机支架+1个+20元+20元.pdf</b>、<b>胸针+6个+3.79元+22.76元.pdf</b></div>
+  </div>
+
+  <div class="row-center">
+    <button class="btn btn-primary" id="btn_extract" onclick="doExtract()">开始解析</button>
+    <span class="hint">解析后可逐条核对、修改，再生成文件</span>
+  </div>
+
+  <!-- 解析结果 -->
+  <div id="result" class="hidden">
+    <div class="card">
+      <h2>③ 核对明细（金额以文件名/发票为准，可修改）</h2>
+      <div class="summary-bar">
+        <span>合计金额：<span class="num" id="total_disp">0.00</span> 元</span>
+        <span class="tag" id="count_disp"></span>
+        <span style="margin-left:auto"><button class="btn btn-ghost" onclick="addRow()" style="padding:7px 14px;font-size:13px">＋ 添加一行</button></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="items">
+          <thead><tr>
+            <th>发票</th><th>费用类别</th><th>物品名称</th><th style="width:70px">数量</th><th>单位</th><th>单价(元)</th><th>金额(元)</th><th></th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>④ 报销说明正文（自动生成，可修改）</h2>
+      <div class="field" style="margin-bottom:10px"><label>第一段（时间与活动）</label><textarea id="nar_p1"></textarea></div>
+      <div class="field"><label>第二段（用途与金额）</label><textarea id="nar_p2"></textarea></div>
+    </div>
+
+    <div class="row-center">
+      <button class="btn btn-success" id="btn_gen" onclick="doGenerate()">生成并下载三个文件</button>
+      <span class="hint">将生成：支出单.xlsx、报销说明.docx、发票订单明细.docx</span>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let state = { session_id:null, items:[], thumbnails:[], narrative:{p1:"",p2:""}, invoice_count:0, order_count:0 };
+
+function $(id){return document.getElementById(id)}
+function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2600)}
+
+// ---------- 上传交互 ----------
+let invList = [];   // 已选的发票文件（可多选、可追加、可移除）
+let ordList = [];   // 已选的订单截图文件
+
+function bindDrop(drop, input, filesBox, store){
+  drop.addEventListener("click",()=>input.click());
+  drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("drag")});
+  drop.addEventListener("dragleave",()=>drop.classList.remove("drag"));
+  drop.addEventListener("drop",e=>{
+    e.preventDefault(); drop.classList.remove("drag");
+    addFiles(store, Array.from(e.dataTransfer.files), filesBox);
+  });
+  input.addEventListener("change",()=>{
+    addFiles(store, Array.from(input.files), filesBox);
+    input.value = "";   // 清空，保证再次选同一文件也能触发 change
+  });
+}
+function addFiles(store, files, box){
+  files.forEach(f=>store.push(f));
+  renderFiles(store, box);
+}
+function renderFiles(store, box){
+  box.innerHTML="";
+  store.forEach((f,i)=>{
+    const d=document.createElement("div");
+    const del=document.createElement("span");
+    del.textContent="✕ "; del.style.cursor="pointer"; del.style.color="#dc2626"; del.title="移除该文件";
+    del.onclick=()=>{ store.splice(i,1); renderFiles(store, box); };
+    d.appendChild(del);
+    d.appendChild(document.createTextNode(f.name));
+    box.appendChild(d);
+  });
+}
+bindDrop($("drop_inv"),$("inv_input"),$("inv_files"),invList);
+bindDrop($("drop_ord"),$("ord_input"),$("ord_files"),ordList);
+
+// ---------- 解析 ----------
+async function doExtract(){
+  if(!invList.length){toast("请先上传发票文件");return}
+  if(!$("name").value.trim() || !$("activity").value.trim()){toast("请填写报销人姓名和活动事由");return}
+
+  const btn=$("btn_extract"); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>解析中…';
+  const fd = new FormData();
+  fd.append("name",$("name").value.trim());
+  fd.append("student_id",$("student_id").value.trim());
+  fd.append("phone",$("phone").value.trim());
+  fd.append("department",$("department").value.trim());
+  fd.append("activity",$("activity").value.trim());
+  fd.append("ticket_count",$("ticket_count").value.trim());
+  invList.forEach(f=>fd.append("invoices",f));
+  ordList.forEach(f=>fd.append("orders",f));
+
+  try{
+    const r = await fetch("/api/extract",{method:"POST",body:fd});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error||("请求失败 "+r.status));
+    state.session_id = j.session_id;
+    state.items = j.items.map(it=>({...it}));
+    state.thumbnails = j.thumbnails||[];
+    state.narrative = j.narrative||{p1:"",p2:""};
+    state.invoice_count = j.invoice_count||0; state.order_count = j.order_count||0;
+    $("ticket_count").value = j.meta.ticket_count||j.invoice_count||state.items.length;
+    $("nar_p1").value = state.narrative.p1; $("nar_p2").value = state.narrative.p2;
+    render();
+    $("result").classList.remove("hidden");
+    $("result").scrollIntoView({behavior:"smooth"});
+    toast(`解析完成：${state.items.length} 条明细`);
+  }catch(e){
+    toast("解析出错："+e.message);
+  }finally{
+    btn.disabled=false; btn.textContent="开始解析";
+  }
+}
+
+// ---------- 表格渲染 ----------
+function round2(v){return Math.round(v*100)/100}
+function esc(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;")}
+
+function render(){
+  const tb=$("tbody"); tb.innerHTML="";
+  state.items.forEach((it,i)=>{
+    const tr=document.createElement("tr");
+    const thumb = state.thumbnails[it.invoice_index] || state.thumbnails[i] || "";
+    tr.innerHTML = `
+      <td>${thumb?`<img class="thumb" src="${thumb}" title="发票${(it.invoice_index??i)+1}">`:""}</td>
+      <td><select data-k="category">${["采购费","打车费"].map(c=>`<option ${it.category===c?"selected":""}>${c}</option>`).join("")}</select></td>
+      <td><input data-k="name" value="${esc(it.name||"")}" placeholder="如：胸针"></td>
+      <td><input data-k="quantity" class="num-in" type="number" step="any" min="0" value="${it.quantity??1}"></td>
+      <td><input data-k="unit" value="${esc(it.unit||"个")}" style="width:56px"></td>
+      <td><input data-k="unit_price" class="num-in" type="number" step="0.01" min="0" value="${it.unit_price??""}"></td>
+      <td><input data-k="amount" class="num-in" type="number" step="0.01" min="0" value="${it.amount??""}"></td>
+      <td><button class="btn btn-danger" onclick="delRow(${i})" style="padding:4px 8px;font-size:12px">删除</button></td>`;
+    tr.querySelectorAll("input,select").forEach(el=>{
+      el.addEventListener("input",()=>{ state.items[i][el.dataset.k] = el.value; recalcTotal(); });
+    });
+    tb.appendChild(tr);
+  });
+  recalcTotal();
+}
+
+function recalcTotal(){
+  let total=0; state.items.forEach(it=>{ const a=Number(it.amount); if(a>0) total+=a; });
+  $("total_disp").textContent = round2(total).toFixed(2);
+  $("count_disp").textContent = `共 ${state.items.length} 条 · 发票 ${state.invoice_count} 张`;
+}
+function addRow(){
+  state.items.push({category:"采购费",name:"",quantity:1,unit:"个",unit_price:null,amount:null,invoice_index:state.items.length});
+  render();
+}
+function delRow(i){state.items.splice(i,1);render();}
+
+// ---------- 生成 ----------
+async function doGenerate(){
+  if(!state.items.length){toast("没有明细可生成");return}
+  const items = state.items.map(it=>({
+    category: it.category||"采购费", name: it.name||"", quantity: Number(it.quantity)||1,
+    unit: it.unit||"个",
+    unit_price: it.unit_price===""||it.unit_price===null?null:Number(it.unit_price),
+    amount: it.amount===""||it.amount===null?null:Number(it.amount),
+  }));
+  const body = {
+    session_id: state.session_id,
+    meta: {
+      name:$("name").value.trim(), student_id:$("student_id").value.trim(),
+      phone:$("phone").value.trim(), department:$("department").value.trim(),
+      activity:$("activity").value.trim(), ticket_count:$("ticket_count").value.trim(),
+      date_year: new Date().getFullYear(), date_month: new Date().getMonth()+1, date_day: new Date().getDate(),
+    },
+    items,
+    narrative: { p1: $("nar_p1").value, p2: $("nar_p2").value },
+  };
+  const btn=$("btn_gen"); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>生成中…';
+  try{
+    const r = await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(e.error||("生成失败 "+r.status)); }
+    const blob = await r.blob();
+    const cd = r.headers.get("Content-Disposition")||"";
+    const m = cd.match(/filename\*=UTF-8''(.+)/) || cd.match(/filename="?([^"]+)"?/);
+    const fname = m? decodeURIComponent(m[1]) : "报销材料.zip";
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast("生成成功，已开始下载");
+  }catch(e){ toast("生成出错："+e.message); }
+  finally{ btn.disabled=false; btn.textContent="生成并下载三个文件"; }
+}
+</script>
+</body>
+</html>
